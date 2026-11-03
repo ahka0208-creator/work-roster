@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>📅 當值排班月曆 App</title>
+    <!-- 引入 PDF.js 用於直接讀取及預覽每月上傳的 PDF 更表 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0F172A;
+            --bg-card: #1E293B;
+            --text-main: #F8FAFC;
+            --text-muted: #94A3B8;
+            --primary: #38BDF8;
+            --border: rgba(255, 255, 255, 0.08);
+
+            /* 對應原圖更表配色 */
+            --reg-bg: rgba(34, 197, 94, 0.16);
+            --reg-border: #22C55E;
+            --reg-text: #4ADE80;
+
+            --long-bg: rgba(59, 130, 246, 0.18);
+            --long-border: #3B82F6;
+            --long-text: #60A5FA;
+
+            --night-bg: rgba(245, 158, 11, 0.2);
+            --night-border: #F59E0B;
+            --night-text: #FBBF24;
+
+            --off-bg: rgba(255, 255, 255, 0.02);
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding-bottom: 60px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        /* 頂部標題與上傳按鈕 */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-title h2 {
+            margin: 0;
+            font-size: 20px;
+            color: var(--text-main);
+            letter-spacing: 0.5px;
+        }
+        .header-title p {
+            margin: 3px 0 0 0;
+            font-size: 12px;
+            color: var(--primary);
+            font-weight: bold;
+        }
+        .upload-trigger-btn {
+            background: linear-gradient(135deg, #38BDF8 0%, #2563EB 100%);
+            color: #fff;
+            border: none;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .upload-trigger-btn:active { transform: scale(0.96); }
+
+        /* 今日與聽日當值狀態卡 */
+        .today-banner {
+            background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            border-radius: 18px;
+            padding: 16px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+        .banner-col {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .banner-col:first-child {
+            border-right: 1px solid var(--border);
+            padding-right: 10px;
+        }
+        .banner-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: bold;
+        }
+        .banner-shift {
+            font-size: 18px;
+            font-weight: 900;
+        }
+        .banner-time {
+            font-size: 13px;
+            color: var(--text-main);
+            font-weight: bold;
+        }
+        .banner-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* 全月統計 4 格看板 */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+        .stat-pill {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px 6px;
+            text-align: center;
+        }
+        .stat-pill span {
+            display: block;
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-bottom: 3px;
+        }
+        .stat-pill strong {
+            font-size: 15px;
+            color: var(--text-main);
+            font-weight: 900;
+        }
+
+        /* 月份切換與印仔模式控制列 */
+        .calendar-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-card);
+            padding: 10px 14px;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+        }
+        .month-nav {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .nav-arrow {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .month-title {
+            font-size: 16px;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+        }
+        .stamp-toggle-btn {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 7px 11px;
+            border-radius: 9px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .stamp-toggle-btn.active {
+            background: rgba(251, 191, 36, 0.2);
+            border-color: #FBBF24;
+            color: #FBBF24;
+        }
+
+        /* 快速排班印仔工具列 (開啟時顯示) */
+        .stamp-bar {
+            display: none;
+            background: var(--bg-card);
+            border: 1px solid rgba(251, 191, 36, 0.4);
+            border-radius: 14px;
+            padding: 12px;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .stamp-list {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+        }
+        .stamp-chip {
+            border: 1px solid var(--border);
+            background: rgba(0, 0, 0, 0.3);
+            color: var(--text-main);
+            padding: 7px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: bold;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+        .stamp-chip.selected {
+            outline: 2px solid #FBBF24;
+            background: rgba(251, 191, 36, 0.15);
+        }
+
+        /* 月曆網格 */
+        .calendar-card {
+            background: var(--bg-card);
+            border-radius: 18px;
+            padding: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
+        }
+        .weekdays-row {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            text-align: center;
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--text-muted);
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 8px;
+        }
+        .weekdays-row div:first-child { color: #F87171; }
+        .weekdays-row div:last-child { color: #60A5FA; }
+
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+        }
+        .day-cell {
+            min-height: 78px;
+            border-radius: 10px;
+            padding: 5px 3px;
+            border: 1px solid var(--border);
+            background: var(--off-bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.1s;
+        }
+        .day-cell:active { transform: scale(0.95); }
+        .day-cell.empty {
+            background: transparent;
+            border-color: transparent;
+            cursor: default;
+        }
+        .day-cell.today {
+            box-shadow: 0 0 0 2px #FFFFFF inset;
+        }
+
+        /* 班別專屬顏色 */
+        .day-cell.type-reg {
+            background: var(--reg-bg);
+            border-color: rgba(34, 197, 94, 0.45);
+        }
+        .day-cell.type-long {
+            background: var(--long-bg);
+            border-color: rgba(59, 130, 246, 0.5);
+        }
+        .day-cell.type-night {
+            background: var(--night-bg);
+            border-color: rgba(245, 158, 11, 0.6);
+        }
+
+        .day-num {
+            font-size: 12px;
+            font-weight: 800;
+            align-self: flex-end;
+            padding-right: 3px;
+            color: var(--text-muted);
+            margin-bottom: 3px;
+        }
+        .day-cell.today .day-num {
+            color: #fff;
+            background: #EF4444;
+            border-radius: 4px;
+            padding: 0 4px;
+        }
+
+        .shift-pill {
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 5px;
+            border-radius: 6px;
+            margin-bottom: 3px;
+            text-align: center;
+            line-height: 1.1;
+            width: 95%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .type-reg .shift-pill { background: rgba(34, 197, 94, 0.25); color: var(--reg-text); }
+        .type-long .shift-pill { background: rgba(59, 130, 246, 0.3); color: var(--long-text); }
+        .type-night .shift-pill { background: rgba(245, 158, 11, 0.3); color: var(--night-text); }
+
+        .shift-time-mini {
+            font-size: 9px;
+            color: var(--text-main);
+            font-weight: 700;
+            line-height: 1.15;
+            text-align: center;
+        }
+        .shift-sess-mini {
+            font-size: 9px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .off-dash {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.2);
+            margin-top: 14px;
+        }
+
+        /* 原檔預覽區 */
+        .preview-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 14px;
+            border: 1px solid var(--border);
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .preview-card img {
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+
+        /* 彈出視窗 (上傳 PDF / 編輯單日更表) */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .modal-box {
+            background: var(--bg-card);
+            width: 100%;
+            max-width: 420px;
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+        .modal-header h3 { margin: 0; font-size: 17px; color: var(--primary); }
+        .close-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: none;
+            color: var(--text-main);
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .preset-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .preset-btn {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 10px;
+            border-radius: 10px;
+            text-align: left;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .preset-btn strong { display: block; font-size: 13px; margin-bottom: 2px; }
+
+        .form-row {
+            margin-bottom: 12px;
+        }
+        .form-row label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+        }
+        .form-input, .form-select {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 11px;
+            border-radius: 10px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .drop-zone {
+            border: 2px dashed rgba(56, 189, 248, 0.45);
+            background: rgba(56, 189, 248, 0.05);
+            border-radius: 14px;
+            padding: 22px 14px;
+            text-align: center;
+            cursor: pointer;
+            margin-bottom: 14px;
+        }
+
+        .primary-btn {
+            width: 100%;
+            background: var(--primary);
+            color: #0F172A;
+            border: none;
+            padding: 13px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 頂部欄 -->
+    <div class="header">
+        <div class="header-title">
+            <h2>📅 陳鎵榮 (C) 當值排班表</h2>
+            <p id="subHeaderText">支援每月上傳 PDF / 圖片自動更新</p>
+        </div>
+        <button class="upload-trigger-btn" onclick="openUploadModal()">
+            📤 上傳新更表
+        </button>
+    </div>
+
+    <!-- 今日與聽日當值雷達 -->
+    <div class="today-banner">
+        <div class="banner-col">
+            <span class="banner-label" id="todayDateLabel">📍 今日當值</span>
+            <span class="banner-shift" id="todayShiftType">--</span>
+            <span class="banner-time" id="todayShiftTime">--</span>
+            <span class="banner-sub" id="todayShiftSess">--</span>
+        </div>
+        <div class="banner-col">
+            <span class="banner-label" id="tmrDateLabel">⏭️ 聽日預告</span>
+            <span class="banner-shift" id="tmrShiftType">--</span>
+            <span class="banner-time" id="tmrShiftTime">--</span>
+            <span class="banner-sub" id="tmrShiftSess">--</span>
+        </div>
+    </div>
+
+    <!-- 全月統計看板 -->
+    <div class="stats-bar">
+        <div class="stat-pill">
+            <span>全月當值</span>
+            <strong id="statDays">0天</strong>
+        </div>
+        <div class="stat-pill">
+            <span>總節數</span>
+            <strong id="statSessions">0節</strong>
+        </div>
+        <div class="stat-pill">
+            <span>總時數</span>
+            <strong id="statHours">0小時</strong>
+        </div>
+        <div class="stat-pill">
+            <span>通宵值夜</span>
+            <strong id="statNights" style="color:var(--night-text);">0次</strong>
+        </div>
+    </div>
+
+    <!-- 月份導航與快速印仔開關 -->
+    <div class="calendar-controls">
+        <div class="month-nav">
+            <button class="nav-arrow" onclick="changeMonth(-1)">◀</button>
+            <span class="month-title" id="currentMonthLabel">2026年 11月</span>
+            <button class="nav-arrow" onclick="changeMonth(1)">▶</button>
+        </div>
+        <button class="stamp-toggle-btn" id="stampModeBtn" onclick="toggleStampMode()">
+            🎨 快速印仔排班
+        </button>
+    </div>
+
+    <!-- 快速排班印仔列 -->
+    <div class="stamp-bar" id="stampBar">
+        <div style="font-size:12px; color:#FBBF24; font-weight:bold;">
+            👇 先揀下面一個印仔，再直接篤月曆日子即可極速排班：
+        </div>
+        <div class="stamp-list" id="stampList"></div>
+    </div>
+
+    <!-- 月曆主體 -->
+    <div class="calendar-card">
+        <div class="weekdays-row">
+            <div>SUN</div>
+            <div>MON</div>
+            <div>TUE</div>
+            <div>WED</div>
+            <div>THU</div>
+            <div>FRI</div>
+            <div>SAT</div>
+        </div>
+        <div class="days-grid" id="calendarGrid"></div>
+    </div>
+
+    <!-- 已上傳的 PDF / 圖片原檔核對區 -->
+    <div class="preview-card" id="rawSheetCard">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:13px; font-weight:bold; color:var(--primary);">📄 本月已上傳更表原檔 (可放大核對)</span>
+            <button class="close-btn" style="width:auto; padding:0 10px; font-size:11px;" onclick="clearRawSheet()">移除原圖</button>
+        </div>
+        <img id="rawSheetImg" src="" alt="更表原檔">
+    </div>
+</div>
+
+<!-- ================= 彈出視窗 1：編輯單日班次 ================= -->
+<div class="modal-overlay" id="editDayModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3 id="editModalTitle">編輯當值班次</h3>
+            <button class="close-btn" onclick="closeEditModal()">✕</button>
+        </div>
+
+        <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">⚡ 一鍵套用常用班別：</div>
+        <div class="preset-grid" id="presetGrid"></div>
+
+        <div class="form-row">
+            <label>班別名稱</label>
+            <input type="text" id="inputShiftName" class="form-input" placeholder="例如：常規班 / 長班 / 通宵值夜班 / 放假">
+        </div>
+        <div class="form-row">
+            <label>顏色分類</label>
+            <select id="inputShiftColor" class="form-select">
+                <option value="reg">🟢 綠色 (常規班 / 短班 / 早班)</option>
+                <option value="long">🔵 藍色 (長班)</option>
+                <option value="night">🟡 黃色 (通宵值夜班)</option>
+                <option value="off">⚪ 放假 (—)</option>
+            </select>
+        </div>
+        <div style="display:grid; grid-template-columns: 1.4fr 0.8fr 0.8fr; gap:8px;">
+            <div class="form-row">
+                <label>當值時間</label>
+                <input type="text" id="inputShiftTime" class="form-input" placeholder="10:00 - 18:00">
+            </div>
+            <div class="form-row">
+                <label>節數</label>
+                <input type="number" id="inputShiftSess" class="form-input" placeholder="4">
+            </div>
+            <div class="form-row">
+                <label>時數 (h)</label>
+                <input type="number" id="inputShiftHours" class="form-input" placeholder="8">
+            </div>
+        </div>
+
+        <button class="primary-btn" onclick="saveDayEdit()">💾 儲存更動</button>
+    </div>
+</div>
+
+<!-- ================= 彈出視窗 2：上傳新月份 PDF / 圖片 ================= -->
+<div class="modal-overlay" id="uploadModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3>📤 上傳每月更表 (PDF / 圖片)</h3>
+            <button class="close-btn" onclick="closeUploadModal()">✕</button>
+        </div>
+
+        <div class="form-row">
+            <label>選擇要匯入的目標月份</label>
+            <input type="month" id="uploadTargetMonth" class="form-input" value="2026-11">
+        </div>
+
+        <div class="drop-zone" onclick="document.getElementById('pdfFileInput').click()">
+            <div style="font-size:32px; margin-bottom:6px;">📄</div>
+            <div style="font-size:14px; font-weight:bold; color:var(--text-main);">點擊揀選每月更表 PDF 或 圖片</div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">
+                支援自動提取 PDF 文字班次、保存原圖對照，或配合 Gemini API 自動讀圖排班
+            </div>
+        </div>
+        <input type="file" id="pdfFileInput" accept=".pdf,image/*" style="display:none" onchange="handleFileUpload(event)">
+
+        <div id="uploadStatusBox" style="font-size:12px; color:#34D399; margin-bottom:12px; display:none; line-height:1.5;"></div>
+
+        <details style="font-size:12px; color:var(--text-muted); margin-top:8px;">
+            <summary style="cursor:pointer; color:var(--text-main); font-weight:bold;">🤖 選填：綁定 Gemini API Key (支援相片/掃描版 PDF 自動讀表)</summary>
+            <p style="margin:8px 0;">如你的更表係圖片或無文字層嘅掃描 PDF，填入免費 Gemini API Key 後上傳即可 100% 自動識別全月班次：</p>
+            <input type="password" id="geminiKeyInput" class="form-input" placeholder="貼上 Gemini API Key (AIzaSy...)" oninput="saveGeminiKey()">
+        </details>
+    </div>
+</div>
+
+<script>
+    // 設定 PDF.js Worker
+    if (window.pdfjsLib) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    // 常用班別預設庫 (根據你提供的 2026年11月更表設定)
+    const SHIFT_PRESETS = [
+        { type: "常規班", color: "reg", time: "10:00 - 18:00", sessions: 4, hours: 8 },
+        { type: "常規班", color: "reg", time: "14:00 - 22:00", sessions: 4, hours: 8 },
+        { type: "長班", color: "long", time: "10:00 - 22:00", sessions: 6, hours: 12 },
+        { type: "長班", color: "long", time: "08:00 - 22:00", sessions: 7, hours: 14 },
+        { type: "通宵值夜班", color: "night", time: "10:00 - 翌日08:00", sessions: 8, hours: 16 },
+        { type: "短班", color: "reg", time: "10:00 - 16:00", sessions: 3, hours: 6 },
+        { type: "早班", color: "reg", time: "08:00 - 14:00", sessions: 3, hours: 6 },
+        { type: "放假", color: "off", time: "", sessions: 0, hours: 0 }
+    ];
+
+    // 預載入 2026年11月 陳鎵榮 (C) 當值排班月曆表完整數據
+    const DEFAULT_NOV_2026 = {
+        "2026-11": {
+            1:  { type: "常規班", color: "reg", time: "10:00 - 18:00", sessions: 4, hours: 8 },
+            3:  { type: "常規班", color: "reg", time: "10:00 - 18:00", sessions: 4, hours: 8 },
+            4:  { type: "長班", color: "long", time: "10:00 - 22:00", sessions: 6, hours: 12 },
+            5:  { type: "常規班", color: "reg", time: "10:00 - 18:00", sessions: 4, hours: 8 },
+            8:  { type: "常規班", color: "reg", time: "14:00 - 22:00", sessions: 4, hours: 8 },
+            9:  { type: "常規班", color: "reg", time: "10:00 - 18:00", sessions: 4, hours: 8 },
+            11: { type: "長班", color: "long", time: "10:00 - 22:00", sessions: 6, hours: 12 },
+            12: { type: "常規班", color: "reg", time: "10:00 - 18:00", sessions: 4, hours: 8 },
+            14: { type: "長班", color: "long", time: "10:00 - 22:00", sessions: 6, hours: 12 },
+            15: { type: "常規班", color: "reg", time: "10:00 - 18:00", sessions: 4, hours: 8 },
+            19: { type: "通宵值夜班", color: "night", time: "10:00 - 翌日08:00", sessions: 8, hours: 16 },
+            20: { type: "長班", color: "long", time: "08:00 - 22:00", sessions: 7, hours: 14 },
+            21: { type: "長班", color: "long", time: "10:00 - 22:00", sessions: 6, hours: 12 },
+            22: { type: "短班", color: "reg", time: "10:00 - 16:00", sessions: 3, hours: 6 },
+            23: { type: "常規班", color: "reg", time: "10:00 - 18:00", sessions: 4, hours: 8 },
+            25: { type: "長班", color: "long", time: "10:00 - 22:00", sessions: 6, hours: 12 },
+            26: { type: "短班", color: "reg", time: "10:00 - 16:00", sessions: 3, hours: 6 },
+            28: { type: "通宵值夜班", color: "night", time: "10:00 - 翌日08:00", sessions: 8, hours: 16 },
+            29: { type: "早班", color: "reg", time: "08:00 - 14:00", sessions: 3, hours: 6 }
+        }
+    };
+
+    let allRosters = JSON.parse(localStorage.getItem('ckw_roster_data_v1')) || DEFAULT_NOV_2026;
+    let rawSheets = JSON.parse(localStorage.getItem('ckw_roster_images_v1')) || {};
+    let viewYear = 2026;
+    let viewMonth = 11; // 1-12
+    let isStampMode = false;
+    let activeStampIndex = 0;
+    let editingDay = null;
+
+    window.onload = () => {
+        const savedKey = localStorage.getItem('ckw_gemini_api_key') || '';
+        document.getElementById('geminiKeyInput').value = savedKey;
+
+        initPresetButtons();
+        initStampBar();
+        renderAll();
+    };
+
+    function saveData() {
+        localStorage.setItem('ckw_roster_data_v1', JSON.stringify(allRosters));
+        renderAll();
+    }
+
+    function saveGeminiKey() {
+        localStorage.setItem('ckw_gemini_api_key', document.getElementById('geminiKeyInput').value.trim());
+    }
+
+    function getMonthKey(y, m) {
+        return `${y}-${String(m).padStart(2, '0')}`;
+    }
+
+    function changeMonth(delta) {
+        viewMonth += delta;
+        if (viewMonth > 12) { viewMonth = 1; viewYear++; }
+        if (viewMonth < 1) { viewMonth = 12; viewYear--; }
+        renderAll();
+    }
+
+    // ================= 渲染主畫面與月曆 =================
+    function renderAll() {
+        const mKey = getMonthKey(viewYear, viewMonth);
+        document.getElementById('currentMonthLabel').innerText = `${viewYear}年 ${viewMonth}月`;
+        document.getElementById('uploadTargetMonth').value = mKey;
+
+        const monthData = allRosters[mKey] || {};
+
+        // 1. 更新今日與聽日雷達
+        updateTodayBanner();
+
+        // 2. 計算全月統計
+        let workDays = 0, totalSess = 0, totalHrs = 0, nightCount = 0;
+        Object.values(monthData).forEach(s => {
+            if (s && s.color !== 'off' && s.type !== '放假') {
+                workDays++;
+                totalSess += Number(s.sessions || 0);
+                totalHrs += Number(s.hours || 0);
+                if (s.color === 'night' || (s.type && s.type.includes('通宵'))) {
+                    nightCount++;
+                }
+            }
+        });
+
+        document.getElementById('statDays').innerText = `${workDays}天`;
+        document.getElementById('statSessions').innerText = `${totalSess}節`;
+        document.getElementById('statHours').innerText = `${totalHrs}小時`;
+        document.getElementById('statNights').innerText = `${nightCount}次`;
+
+        // 3. 渲染月曆格仔
+        const grid = document.getElementById('calendarGrid');
+        grid.innerHTML = '';
+
+        const firstDayOfWeek = new Date(viewYear, viewMonth - 1, 1).getDay(); // 0(Sun) - 6(Sat)
+        const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
+
+        const now = new Date();
+        const isCurrentMonth = (now.getFullYear() === viewYear && (now.getMonth() + 1) === viewMonth);
+        const todayDate = now.getDate();
+
+        // 前置空白格
+        for (let i = 0; i < firstDayOfWeek; i++) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'day-cell empty';
+            grid.appendChild(emptyDiv);
+        }
+
+        // 每日格仔
+        for (let d = 1; d <= daysInMonth; d++) {
+            const shift = monthData[d];
+            const cell = document.createElement('div');
+            const isToday = isCurrentMonth && d === todayDate;
+
+            let colorClass = '';
+            let contentHtml = `<div class="off-dash">—</div>`;
+
+            if (shift && shift.color !== 'off' && shift.type !== '放假') {
+                colorClass = `type-${shift.color || 'reg'}`;
+                const shortTime = (shift.time || '').replace('翌日', '翌');
+                contentHtml = `
+                    <div class="shift-pill">${shift.type}</div>
+                    <div class="shift-time-mini">${shortTime}</div>
+                    <div class="shift-sess-mini">${shift.sessions}節 (${shift.hours}h)</div>
+                `;
+            }
+
+            cell.className = `day-cell ${colorClass} ${isToday ? 'today' : ''}`;
+            cell.innerHTML = `
+                <div class="day-num">${d}日</div>
+                ${contentHtml}
+            `;
+
+            cell.onclick = () => onDayCellClick(d);
+            grid.appendChild(cell);
+        }
+
+        // 4. 顯示已儲存的更表原圖
+        const rawCard = document.getElementById('rawSheetCard');
+        if (rawSheets[mKey]) {
+            rawCard.style.display = 'flex';
+            document.getElementById('rawSheetImg').src = rawSheets[mKey];
+        } else {
+            rawCard.style.display = 'none';
+        }
+    }
+
+    function updateTodayBanner() {
+        const now = new Date();
+        const tmr = new Date(now);
+        tmr.setDate(now.getDate() + 1);
+
+        const fillBanner = (dateObj, prefix, labelPrefix) => {
+            const y = dateObj.getFullYear();
+            const m = dateObj.getMonth() + 1;
+            const d = dateObj.getDate();
+            const key = getMonthKey(y, m);
+            const shift = (allRosters[key] || {})[d];
+
+            document.getElementById(`${prefix}DateLabel`).innerText = `${labelPrefix} (${m}月${d}日)`;
+            const typeEl = document.getElementById(`${prefix}ShiftType`);
+            const timeEl = document.getElementById(`${prefix}ShiftTime`);
+            const sessEl = document.getElementById(`${prefix}ShiftSess`);
+
+            if (shift && shift.color !== 'off' && shift.type !== '放假') {
+                typeEl.innerText = shift.type;
+                typeEl.style.color = shift.color === 'night' ? 'var(--night-text)' : (shift.color === 'long' ? 'var(--long-text)' : 'var(--reg-text)');
+                timeEl.innerText = shift.time;
+                sessEl.innerText = `${shift.sessions}節 (${shift.hours}小時)`;
+            } else {
+                typeEl.innerText = '🏠 放假休息';
+                typeEl.style.color = 'var(--text-muted)';
+                timeEl.innerText = '全日無當值';
+                sessEl.innerText = '0節 (0小時)';
+            }
+        };
+
+        fillBanner(now, 'today', '📍 今日');
+        fillBanner(tmr, 'tmr', '⏭️ 聽日');
+    }
+
+    // ================= 點擊日子：快速印仔 或 打開詳細編輯 =================
+    function toggleStampMode() {
+        isStampMode = !isStampMode;
+        document.getElementById('stampModeBtn').classList.toggle('active', isStampMode);
+        document.getElementById('stampBar').style.display = isStampMode ? 'flex' : 'none';
+    }
+
+    function initStampBar() {
+        const list = document.getElementById('stampList');
+        list.innerHTML = '';
+        SHIFT_PRESETS.forEach((p, idx) => {
+            const btn = document.createElement('button');
+            btn.className = `stamp-chip ${idx === activeStampIndex ? 'selected' : ''}`;
+            btn.innerText = p.color === 'off' ? '⚪ 放假 (清除)' : `${p.type} (${p.time.replace(' - ', '-')})`;
+            btn.onclick = () => {
+                activeStampIndex = idx;
+                initStampBar();
+            };
+            list.appendChild(btn);
+        });
+    }
+
+    function onDayCellClick(day) {
+        const mKey = getMonthKey(viewYear, viewMonth);
+        if (!allRosters[mKey]) allRosters[mKey] = {};
+
+        // 如果開啟咗「快速印仔排班」，一篤即刻印落去
+        if (isStampMode) {
+            const preset = SHIFT_PRESETS[activeStampIndex];
+            if (preset.color === 'off') {
+                delete allRosters[mKey][day];
+            } else {
+                allRosters[mKey][day] = { ...preset };
+            }
+            saveData();
+            return;
+        }
+
+        // 否則打開單日編輯視窗
+        editingDay = day;
+        document.getElementById('editModalTitle').innerText = `📅 編輯 ${viewMonth}月${day}日 班次`;
+        const current = allRosters[mKey][day] || { type: '放假', color: 'off', time: '', sessions: 0, hours: 0 };
+
+        document.getElementById('inputShiftName').value = current.type || '';
+        document.getElementById('inputShiftColor').value = current.color || 'off';
+        document.getElementById('inputShiftTime').value = current.time || '';
+        document.getElementById('inputShiftSess').value = current.sessions || 0;
+        document.getElementById('inputShiftHours').value = current.hours || 0;
+
+        document.getElementById('editDayModal').style.display = 'flex';
+    }
+
+    function initPresetButtons() {
+        const grid = document.getElementById('presetGrid');
+        grid.innerHTML = '';
+        SHIFT_PRESETS.forEach(p => {
+            const btn = document.createElement('button');
+            btn.className = 'preset-btn';
+            btn.innerHTML = `
+                <strong style="color:${p.color === 'night' ? '#FBBF24' : (p.color === 'long' ? '#60A5FA' : (p.color === 'reg' ? '#4ADE80' : '#94A3B8'))}">
+                    ${p.type}
+                </strong>
+                <span>${p.time || '清除當日班次'} ${p.sessions ? `(${p.sessions}節)` : ''}</span>
+            `;
+            btn.onclick = () => {
+                document.getElementById('inputShiftName').value = p.type;
+                document.getElementById('inputShiftColor').value = p.color;
+                document.getElementById('inputShiftTime').value = p.time;
+                document.getElementById('inputShiftSess').value = p.sessions;
+                document.getElementById('inputShiftHours').value = p.hours;
+            };
+            grid.appendChild(btn);
+        });
+    }
+
+    function saveDayEdit() {
+        const mKey = getMonthKey(viewYear, viewMonth);
+        if (!allRosters[mKey]) allRosters[mKey] = {};
+
+        const type = document.getElementById('inputShiftName').value.trim();
+        const color = document.getElementById('inputShiftColor').value;
+        const time = document.getElementById('inputShiftTime').value.trim();
+        const sessions = Number(document.getElementById('inputShiftSess').value) || 0;
+        const hours = Number(document.getElementById('inputShiftHours').value) || 0;
+
+        if (color === 'off' || !type || type === '放假') {
+            delete allRosters[mKey][editingDay];
+        } else {
+            allRosters[mKey][editingDay] = { type, color, time, sessions, hours };
+        }
+
+        saveData();
+        closeEditModal();
+    }
+
+    function closeEditModal() {
+        document.getElementById('editDayModal').style.display = 'none';
+    }
+
+    // ================= 上傳 PDF / 圖片自動解析引擎 =================
+    function openUploadModal() {
+        document.getElementById('uploadStatusBox').style.display = 'none';
+        document.getElementById('uploadModal').style.display = 'flex';
+    }
+
+    function closeUploadModal() {
+        document.getElementById('uploadModal').style.display = 'none';
+    }
+
+    async function handleFileUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const targetMonth = document.getElementById('uploadTargetMonth').value || getMonthKey(viewYear, viewMonth);
+        const [tYear, tMonth] = targetMonth.split('-').map(Number);
+        const statusBox = document.getElementById('uploadStatusBox');
+        statusBox.style.display = 'block';
+        statusBox.style.color = '#38BDF8';
+        statusBox.innerText = '⏳ 正在讀取及轉換更表檔案...';
+
+        try {
+            let previewDataUrl = '';
+            let extractedText = '';
+
+            if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const page = await pdf.getPage(1);
+
+                // 1. 提取 PDF 文字層
+                const textContent = await page.getTextContent();
+                extractedText = textContent.items.map(item => item.str).join(' ');
+
+                // 2. 將 PDF 第一頁渲染成高清圖片保存
+                const viewport = page.getViewport({ scale: 1.8 });
+                const canvas = document.createElement('canvas');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                previewDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            } else {
+                // 圖片檔案處理
+                previewDataUrl = await readFileAsDataURL(file);
+            }
+
+            // 儲存原圖方便隨時放大核對
+            rawSheets[targetMonth] = previewDataUrl;
+            localStorage.setItem('ckw_roster_images_v1', JSON.stringify(rawSheets));
+
+            // 嘗試用 PDF 文字層自動解析班次
+            const parsedCount = parseRosterTextIntoMonth(extractedText, targetMonth);
+
+            // 如果有設定 Gemini API Key，且文字層無內容（例如掃描版 PDF 或圖片），自動呼叫 AI 視覺解析
+            const geminiKey = localStorage.getItem('ckw_gemini_api_key');
+            if (parsedCount === 0 && geminiKey && previewDataUrl) {
+                statusBox.innerText = '🤖 偵測到圖片格式更表，正在透過 Gemini AI 自動識別全月班次...';
+                const aiCount = await parseWithGeminiVision(previewDataUrl, targetMonth, geminiKey);
+                statusBox.style.color = '#34D399';
+                statusBox.innerText = `✅ AI 成功識別並匯入 ${aiCount} 日當值班次！`;
+            } else if (parsedCount > 0) {
+                statusBox.style.color = '#34D399';
+                statusBox.innerText = `✅ 成功從 PDF 自動讀取並更新 ${parsedCount} 日當值班次！`;
+            } else {
+                statusBox.style.color = '#FBBF24';
+                statusBox.innerText = `✅ 已保存更表原圖！由於呢份檔案無內嵌文字層，你可以直接開啟「🎨 快速印仔排班」對住原圖篤幾下完成排班，或者喺下方填入 Gemini API Key 自動讀圖。`;
+            }
+
+            viewYear = tYear;
+            viewMonth = tMonth;
+            saveData();
+        } catch (err) {
+            statusBox.style.color = '#F87171';
+            statusBox.innerText = `⚠️ 讀取失敗：${err.message}`;
+        }
+    }
+
+    function readFileAsDataURL(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => resolve(ev.target.result);
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // 解析 PDF 內嵌文字層
+    function parseRosterTextIntoMonth(text, monthKey) {
+        if (!text || text.trim().length < 10) return 0;
+        const regex = /(\d{1,2})\s*日\s*(常規班|長班|通宵值夜班|短班|早班)\s*([0-9:：\s–\-翌日]+)\s*(\d+)\s*節\s*\(\s*(\d+)\s*小時\s*\)/g;
+        let match;
+        let count = 0;
+        if (!allRosters[monthKey]) allRosters[monthKey] = {};
+
+        while ((match = regex.exec(text)) !== null) {
+            const day = parseInt(match[1], 10);
+            const type = match[2];
+            const time = match[3].trim();
+            const sessions = parseInt(match[4], 10);
+            const hours = parseInt(match[5], 10);
+            const color = type.includes('通宵') ? 'night' : (type.includes('長班') ? 'long' : 'reg');
+
+            allRosters[monthKey][day] = { type, color, time, sessions, hours };
+            count++;
+        }
+        return count;
+    }
+
+    // 使用 Gemini Flash 視覺模型自動識別圖片/掃描版 PDF 更表
+    async function parseWithGeminiVision(dataUrl, monthKey, apiKey) {
+        const base64Data = dataUrl.split(',')[1];
+        const prompt = `請讀取這張當值排班月曆表，提取每一日(1-31)的班次資料，並只輸出純 JSON 物件，格式如下：
+        {"1": {"type":"常規班","color":"reg","time":"10:00 - 18:00","sessions":4,"hours":8}, "4": {"type":"長班","color":"long","time":"10:00 - 22:00","sessions":6,"hours":12}}
+        注意：color 只可以是 "reg"(綠:常規/短班/早班), "long"(藍:長班), "night"(黃:通宵值夜班)。放假的日子不要放入 JSON。`;
+
+        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [
+                        { text: prompt },
+                        { inline_data: { mime_type: 'image/jpeg', data: base64Data } }
+                    ]
+                }]
+            })
+        });
+
+        const data = await resp.json();
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('無法解析 AI 回傳格式');
+
+        const parsedObj = JSON.parse(jsonMatch[0]);
+        allRosters[monthKey] = parsedObj;
+        return Object.keys(parsedObj).length;
+    }
+
+    function clearRawSheet() {
+        const mKey = getMonthKey(viewYear, viewMonth);
+        delete rawSheets[mKey];
+        localStorage.setItem('ckw_roster_images_v1', JSON.stringify(rawSheets));
+        renderAll();
+    }
+</script>
+
+</body>
+</html>
