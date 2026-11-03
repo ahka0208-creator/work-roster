@@ -332,10 +332,10 @@
         .type-night .shift-pill { background: rgba(245, 158, 11, 0.3); color: var(--night-text); }
 
         .shift-time-mini {
-            font-size: 9px;
+            font-size: 8.5px;
             color: var(--text-main);
             font-weight: 700;
-            line-height: 1.15;
+            line-height: 1.2;
             text-align: center;
         }
         .shift-sess-mini {
@@ -349,15 +349,15 @@
             margin-top: 14px;
         }
 
-        /* 底部總結備註列 */
-        .summary-footer {
+        /* 底部備註橫幅 */
+        .footer-summary-bar {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px 14px;
             font-size: 12px;
             color: var(--text-muted);
             text-align: center;
-            background: rgba(255, 255, 255, 0.03);
-            padding: 10px 12px;
-            border-radius: 12px;
-            border: 1px solid var(--border);
             line-height: 1.5;
         }
 
@@ -530,9 +530,9 @@
     <!-- 月份導航與快速印仔開關 -->
     <div class="calendar-controls">
         <div class="month-nav">
-            <button class="nav-arrow" onclick="changeMonth(-1)">◀️</button>
+            <button class="nav-arrow" onclick="changeMonth(-1)">◀</button>
             <span class="month-title" id="currentMonthLabel">2026年 11月</span>
-            <button class="nav-arrow" onclick="changeMonth(1)">▶️</button>
+            <button class="nav-arrow" onclick="changeMonth(1)">▶</button>
         </div>
         <button class="stamp-toggle-btn" id="stampModeBtn" onclick="toggleStampMode()">
             🎨 快速印仔排班
@@ -561,8 +561,8 @@
         <div class="days-grid" id="calendarGrid"></div>
     </div>
 
-    <!-- 底部當月文字總結 -->
-    <div class="summary-footer" id="summaryFooterText"></div>
+    <!-- 底部當月總結文字 -->
+    <div class="footer-summary-bar" id="footerSummaryText"></div>
 
     <!-- 已上傳的 PDF / 圖片原檔核對區 -->
     <div class="preview-card" id="rawSheetCard">
@@ -627,4 +627,469 @@
 
         <div class="form-row">
             <label>選擇要匯入的目標月份</label>
-            <input type="month" id="uploadTargetMonth" class
+            <input type="month" id="uploadTargetMonth" class="form-input" value="2026-11">
+        </div>
+
+        <div class="drop-zone" onclick="document.getElementById('pdfFileInput').click()">
+            <div style="font-size:32px; margin-bottom:6px;">📄</div>
+            <div style="font-size:14px; font-weight:bold; color:var(--text-main);">點擊揀選每月更表 PDF 或 圖片</div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">
+                支援自動提取 PDF 文字班次、保存原圖對照，或配合 Gemini API 自動讀圖排班
+            </div>
+        </div>
+        <input type="file" id="pdfFileInput" accept=".pdf,image/*" style="display:none" onchange="handleFileUpload(event)">
+
+        <div id="uploadStatusBox" style="font-size:12px; color:#34D399; margin-bottom:12px; display:none; line-height:1.5;"></div>
+
+        <details style="font-size:12px; color:var(--text-muted); margin-top:8px;">
+            <summary style="cursor:pointer; color:var(--text-main); font-weight:bold;">🤖 選填：綁定 Gemini API Key (支援相片/掃描版 PDF 自動讀表)</summary>
+            <p style="margin:8px 0;">如你的更表係圖片或無文字層嘅掃描 PDF，填入免費 Gemini API Key 後上傳即可 100% 自動識別全月班次：</p>
+            <input type="password" id="geminiKeyInput" class="form-input" placeholder="貼上 Gemini API Key (AIzaSy...)" oninput="saveGeminiKey()">
+        </details>
+    </div>
+</div>
+
+<script>
+    // 設定 PDF.js Worker
+    if (window.pdfjsLib) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    // 常用班別預設庫 (已更新通宵值夜班為 10:00 - 00:00 (+ 值夜) · 7節 / 14小時)
+    const SHIFT_PRESETS = [
+        { type: "常規班", color: "reg", time: "10:00 - 18:00", sessions: 4, hours: 8 },
+        { type: "常規班", color: "reg", time: "14:00 - 22:00", sessions: 4, hours: 8 },
+        { type: "長班", color: "long", time: "10:00 - 22:00", sessions: 6, hours: 12 },
+        { type: "長班", color: "long", time: "08:00 - 22:00", sessions: 7, hours: 14 },
+        { type: "通宵值夜班", color: "night", time: "10:00 - 00:00 (+ 值夜)", sessions: 7, hours: 14 },
+        { type: "短班", color: "reg", time: "10:00 - 16:00", sessions: 3, hours: 6 },
+        { type: "早班", color: "reg", time: "08:00 - 14:00", sessions: 3, hours: 6 },
+        { type: "放假", color: "off", time: "", sessions: 0, hours: 0 }
+    ];
+
+    // 預載入最新 2026年11月 陳鎵榮 (C) 當值排班月曆表 (19天 | 90節 | 180小時)
+    const DEFAULT_NOV_2026 = {
+        "2026-11": {
+            1:  { type: "常規班", color: "reg", time: "10:00 - 18:00", sessions: 4, hours: 8 },
+            3:  { type: "常規班", color: "reg", time: "10:00 - 18:00", sessions: 4, hours: 8 },
+            4:  { type: "長班", color: "long", time: "10:00 - 22:00", sessions: 6, hours: 12 },
+            5:  { type: "常規班", color: "reg", time: "10:00 - 18:00", sessions: 4, hours: 8 },
+            8:  { type: "常規班", color: "reg", time: "14:00 - 22:00", sessions: 4, hours: 8 },
+            9:  { type: "常規班", color: "reg", time: "10:00 - 18:00", sessions: 4, hours: 8 },
+            11: { type: "長班", color: "long", time: "10:00 - 22:00", sessions: 6, hours: 12 },
+            12: { type: "常規班", color: "reg", time: "10:00 - 18:00", sessions: 4, hours: 8 },
+            14: { type: "長班", color: "long", time: "10:00 - 22:00", sessions: 6, hours: 12 },
+            15: { type: "常規班", color: "reg", time: "10:00 - 18:00", sessions: 4, hours: 8 },
+            19: { type: "通宵值夜班", color: "night", time: "10:00 - 00:00 (+ 值夜)", sessions: 7, hours: 14 },
+            20: { type: "長班", color: "long", time: "08:00 - 22:00", sessions: 7, hours: 14 },
+            21: { type: "長班", color: "long", time: "10:00 - 22:00", sessions: 6, hours: 12 },
+            22: { type: "短班", color: "reg", time: "10:00 - 16:00", sessions: 3, hours: 6 },
+            23: { type: "常規班", color: "reg", time: "10:00 - 18:00", sessions: 4, hours: 8 },
+            25: { type: "長班", color: "long", time: "10:00 - 22:00", sessions: 6, hours: 12 },
+            26: { type: "短班", color: "reg", time: "10:00 - 16:00", sessions: 3, hours: 6 },
+            28: { type: "通宵值夜班", color: "night", time: "10:00 - 00:00 (+ 值夜)", sessions: 7, hours: 14 },
+            29: { type: "早班", color: "reg", time: "08:00 - 14:00", sessions: 3, hours: 6 }
+        }
+    };
+
+    // 使用 v2 儲存鍵，確保覆蓋舊版 92 節的快取
+    let allRosters = JSON.parse(localStorage.getItem('ckw_roster_data_v2')) || DEFAULT_NOV_2026;
+    let rawSheets = JSON.parse(localStorage.getItem('ckw_roster_images_v2')) || {};
+    let viewYear = 2026;
+    let viewMonth = 11; // 1-12
+    let isStampMode = false;
+    let activeStampIndex = 0;
+    let editingDay = null;
+
+    window.onload = () => {
+        const savedKey = localStorage.getItem('ckw_gemini_api_key') || '';
+        document.getElementById('geminiKeyInput').value = savedKey;
+
+        initPresetButtons();
+        initStampBar();
+        renderAll();
+    };
+
+    function saveData() {
+        localStorage.setItem('ckw_roster_data_v2', JSON.stringify(allRosters));
+        renderAll();
+    }
+
+    function saveGeminiKey() {
+        localStorage.setItem('ckw_gemini_api_key', document.getElementById('geminiKeyInput').value.trim());
+    }
+
+    function getMonthKey(y, m) {
+        return `${y}-${String(m).padStart(2, '0')}`;
+    }
+
+    function changeMonth(delta) {
+        viewMonth += delta;
+        if (viewMonth > 12) { viewMonth = 1; viewYear++; }
+        if (viewMonth < 1) { viewMonth = 12; viewYear--; }
+        renderAll();
+    }
+
+    // ================= 渲染主畫面與月曆 =================
+    function renderAll() {
+        const mKey = getMonthKey(viewYear, viewMonth);
+        document.getElementById('currentMonthLabel').innerText = `${viewYear}年 ${viewMonth}月`;
+        document.getElementById('uploadTargetMonth').value = mKey;
+
+        const monthData = allRosters[mKey] || {};
+
+        // 1. 更新今日與聽日雷達
+        updateTodayBanner();
+
+        // 2. 計算全月統計
+        let workDays = 0, totalSess = 0, totalHrs = 0;
+        let nightDates = [];
+
+        Object.keys(monthData).sort((a, b) => Number(a) - Number(b)).forEach(dayKey => {
+            const s = monthData[dayKey];
+            if (s && s.color !== 'off' && s.type !== '放假') {
+                workDays++;
+                totalSess += Number(s.sessions || 0);
+                totalHrs += Number(s.hours || 0);
+                if (s.color === 'night' || (s.type && s.type.includes('通宵'))) {
+                    nightDates.push(`${viewMonth}/${dayKey}`);
+                }
+            }
+        });
+
+        document.getElementById('statDays').innerText = `${workDays}天`;
+        document.getElementById('statSessions').innerText = `${totalSess}節`;
+        document.getElementById('statHours').innerText = `${totalHrs}小時`;
+        document.getElementById('statNights').innerText = `${nightDates.length}次`;
+
+        const nightDetailStr = nightDates.length > 0
+            ? `含 ${nightDates.length} 次通宵值夜當值 ( ${nightDates.join('、')} )`
+            : '本月無通宵值夜當值';
+        document.getElementById('footerSummaryText').innerText =
+            `※ 全月當值：${workDays}天 ｜ 總節數：${totalSess}節 (${totalHrs}小時) ｜ ${nightDetailStr}`;
+
+        // 3. 渲染月曆格仔
+        const grid = document.getElementById('calendarGrid');
+        grid.innerHTML = '';
+
+        const firstDayOfWeek = new Date(viewYear, viewMonth - 1, 1).getDay();
+        const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
+
+        const now = new Date();
+        const isCurrentMonth = (now.getFullYear() === viewYear && (now.getMonth() + 1) === viewMonth);
+        const todayDate = now.getDate();
+
+        for (let i = 0; i < firstDayOfWeek; i++) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'day-cell empty';
+            grid.appendChild(emptyDiv);
+        }
+
+        for (let d = 1; d <= daysInMonth; d++) {
+            const shift = monthData[d];
+            const cell = document.createElement('div');
+            const isToday = isCurrentMonth && d === todayDate;
+
+            let colorClass = '';
+            let contentHtml = `<div class="off-dash">—</div>`;
+
+            if (shift && shift.color !== 'off' && shift.type !== '放假') {
+                colorClass = `type-${shift.color || 'reg'}`;
+                const formattedTime = (shift.time || '').replace(' (+ 值夜)', '<br>(+ 值夜)');
+                contentHtml = `
+                    <div class="shift-pill">${shift.type}</div>
+                    <div class="shift-time-mini">${formattedTime}</div>
+                    <div class="shift-sess-mini">${shift.sessions}節 (${shift.hours}h)</div>
+                `;
+            }
+
+            cell.className = `day-cell ${colorClass} ${isToday ? 'today' : ''}`;
+            cell.innerHTML = `
+                <div class="day-num">${d}日</div>
+                ${contentHtml}
+            `;
+
+            cell.onclick = () => onDayCellClick(d);
+            grid.appendChild(cell);
+        }
+
+        // 4. 顯示已儲存的更表原圖
+        const rawCard = document.getElementById('rawSheetCard');
+        if (rawSheets[mKey]) {
+            rawCard.style.display = 'flex';
+            document.getElementById('rawSheetImg').src = rawSheets[mKey];
+        } else {
+            rawCard.style.display = 'none';
+        }
+    }
+
+    function updateTodayBanner() {
+        const now = new Date();
+        const tmr = new Date(now);
+        tmr.setDate(now.getDate() + 1);
+
+        const fillBanner = (dateObj, prefix, labelPrefix) => {
+            const y = dateObj.getFullYear();
+            const m = dateObj.getMonth() + 1;
+            const d = dateObj.getDate();
+            const key = getMonthKey(y, m);
+            const shift = (allRosters[key] || {})[d];
+
+            document.getElementById(`${prefix}DateLabel`).innerText = `${labelPrefix} (${m}月${d}日)`;
+            const typeEl = document.getElementById(`${prefix}ShiftType`);
+            const timeEl = document.getElementById(`${prefix}ShiftTime`);
+            const sessEl = document.getElementById(`${prefix}ShiftSess`);
+
+            if (shift && shift.color !== 'off' && shift.type !== '放假') {
+                typeEl.innerText = shift.type;
+                typeEl.style.color = shift.color === 'night' ? 'var(--night-text)' : (shift.color === 'long' ? 'var(--long-text)' : 'var(--reg-text)');
+                timeEl.innerText = shift.time;
+                sessEl.innerText = `${shift.sessions}節 (${shift.hours}小時)`;
+            } else {
+                typeEl.innerText = '🏠 放假休息';
+                typeEl.style.color = 'var(--text-muted)';
+                timeEl.innerText = '全日無當值';
+                sessEl.innerText = '0節 (0小時)';
+            }
+        };
+
+        fillBanner(now, 'today', '📍 今日');
+        fillBanner(tmr, 'tmr', '⏭️ 聽日');
+    }
+
+    // ================= 點擊日子：快速印仔 或 打開詳細編輯 =================
+    function toggleStampMode() {
+        isStampMode = !isStampMode;
+        document.getElementById('stampModeBtn').classList.toggle('active', isStampMode);
+        document.getElementById('stampBar').style.display = isStampMode ? 'flex' : 'none';
+    }
+
+    function initStampBar() {
+        const list = document.getElementById('stampList');
+        list.innerHTML = '';
+        SHIFT_PRESETS.forEach((p, idx) => {
+            const btn = document.createElement('button');
+            btn.className = `stamp-chip ${idx === activeStampIndex ? 'selected' : ''}`;
+            btn.innerText = p.color === 'off' ? '⚪ 放假 (清除)' : `${p.type} (${p.time.replace(' - ', '-')})`;
+            btn.onclick = () => {
+                activeStampIndex = idx;
+                initStampBar();
+            };
+            list.appendChild(btn);
+        });
+    }
+
+    function onDayCellClick(day) {
+        const mKey = getMonthKey(viewYear, viewMonth);
+        if (!allRosters[mKey]) allRosters[mKey] = {};
+
+        if (isStampMode) {
+            const preset = SHIFT_PRESETS[activeStampIndex];
+            if (preset.color === 'off') {
+                delete allRosters[mKey][day];
+            } else {
+                allRosters[mKey][day] = { ...preset };
+            }
+            saveData();
+            return;
+        }
+
+        editingDay = day;
+        document.getElementById('editModalTitle').innerText = `📅 編輯 ${viewMonth}月${day}日 班次`;
+        const current = allRosters[mKey][day] || { type: '放假', color: 'off', time: '', sessions: 0, hours: 0 };
+
+        document.getElementById('inputShiftName').value = current.type || '';
+        document.getElementById('inputShiftColor').value = current.color || 'off';
+        document.getElementById('inputShiftTime').value = current.time || '';
+        document.getElementById('inputShiftSess').value = current.sessions || 0;
+        document.getElementById('inputShiftHours').value = current.hours || 0;
+
+        document.getElementById('editDayModal').style.display = 'flex';
+    }
+
+    function initPresetButtons() {
+        const grid = document.getElementById('presetGrid');
+        grid.innerHTML = '';
+        SHIFT_PRESETS.forEach(p => {
+            const btn = document.createElement('button');
+            btn.className = 'preset-btn';
+            btn.innerHTML = `
+                <strong style="color:${p.color === 'night' ? '#FBBF24' : (p.color === 'long' ? '#60A5FA' : (p.color === 'reg' ? '#4ADE80' : '#94A3B8'))}">
+                    ${p.type}
+                </strong>
+                <span>${p.time || '清除當日班次'} ${p.sessions ? `(${p.sessions}節)` : ''}</span>
+            `;
+            btn.onclick = () => {
+                document.getElementById('inputShiftName').value = p.type;
+                document.getElementById('inputShiftColor').value = p.color;
+                document.getElementById('inputShiftTime').value = p.time;
+                document.getElementById('inputShiftSess').value = p.sessions;
+                document.getElementById('inputShiftHours').value = p.hours;
+            };
+            grid.appendChild(btn);
+        });
+    }
+
+    function saveDayEdit() {
+        const mKey = getMonthKey(viewYear, viewMonth);
+        if (!allRosters[mKey]) allRosters[mKey] = {};
+
+        const type = document.getElementById('inputShiftName').value.trim();
+        const color = document.getElementById('inputShiftColor').value;
+        const time = document.getElementById('inputShiftTime').value.trim();
+        const sessions = Number(document.getElementById('inputShiftSess').value) || 0;
+        const hours = Number(document.getElementById('inputShiftHours').value) || 0;
+
+        if (color === 'off' || !type || type === '放假') {
+            delete allRosters[mKey][editingDay];
+        } else {
+            allRosters[mKey][editingDay] = { type, color, time, sessions, hours };
+        }
+
+        saveData();
+        closeEditModal();
+    }
+
+    function closeEditModal() {
+        document.getElementById('editDayModal').style.display = 'none';
+    }
+
+    // ================= 上傳 PDF / 圖片自動解析引擎 =================
+    function openUploadModal() {
+        document.getElementById('uploadStatusBox').style.display = 'none';
+        document.getElementById('uploadModal').style.display = 'flex';
+    }
+
+    function closeUploadModal() {
+        document.getElementById('uploadModal').style.display = 'none';
+    }
+
+    async function handleFileUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const targetMonth = document.getElementById('uploadTargetMonth').value || getMonthKey(viewYear, viewMonth);
+        const [tYear, tMonth] = targetMonth.split('-').map(Number);
+        const statusBox = document.getElementById('uploadStatusBox');
+        statusBox.style.display = 'block';
+        statusBox.style.color = '#38BDF8';
+        statusBox.innerText = '⏳ 正在讀取及轉換更表檔案...';
+
+        try {
+            let previewDataUrl = '';
+            let extractedText = '';
+
+            if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const page = await pdf.getPage(1);
+
+                const textContent = await page.getTextContent();
+                extractedText = textContent.items.map(item => item.str).join(' ');
+
+                const viewport = page.getViewport({ scale: 1.8 });
+                const canvas = document.createElement('canvas');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                previewDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            } else {
+                previewDataUrl = await readFileAsDataURL(file);
+            }
+
+            rawSheets[targetMonth] = previewDataUrl;
+            localStorage.setItem('ckw_roster_images_v2', JSON.stringify(rawSheets));
+
+            const parsedCount = parseRosterTextIntoMonth(extractedText, targetMonth);
+
+            const geminiKey = localStorage.getItem('ckw_gemini_api_key');
+            if (parsedCount === 0 && geminiKey && previewDataUrl) {
+                statusBox.innerText = '🤖 偵測到圖片格式更表，正在透過 Gemini AI 自動識別全月班次...';
+                const aiCount = await parseWithGeminiVision(previewDataUrl, targetMonth, geminiKey);
+                statusBox.style.color = '#34D399';
+                statusBox.innerText = `✅ AI 成功識別並匯入 ${aiCount} 日當值班次！`;
+            } else if (parsedCount > 0) {
+                statusBox.style.color = '#34D399';
+                statusBox.innerText = `✅ 成功從 PDF 自動讀取並更新 ${parsedCount} 日當值班次！`;
+            } else {
+                statusBox.style.color = '#FBBF24';
+                statusBox.innerText = `✅ 已保存更表原圖！由於呢份檔案無內嵌文字層，你可以直接開啟「🎨 快速印仔排班」對住原圖篤幾下完成排班，或者喺下方填入 Gemini API Key 自動讀圖。`;
+            }
+
+            viewYear = tYear;
+            viewMonth = tMonth;
+            saveData();
+        } catch (err) {
+            statusBox.style.color = '#F87171';
+            statusBox.innerText = `⚠️ 讀取失敗：${err.message}`;
+        }
+    }
+
+    function readFileAsDataURL(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => resolve(ev.target.result);
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function parseRosterTextIntoMonth(text, monthKey) {
+        if (!text || text.trim().length < 10) return 0;
+        const regex = /(\d{1,2})\s*日\s*(常規班|長班|通宵值夜班|短班|早班)\s*([0-9:：\s–\-翌日(+值夜)]+?)\s*(\d+)\s*節\s*\(\s*(\d+)\s*小時\s*\)/g;
+        let match;
+        let count = 0;
+        if (!allRosters[monthKey]) allRosters[monthKey] = {};
+
+        while ((match = regex.exec(text)) !== null) {
+            const day = parseInt(match[1], 10);
+            const type = match[2];
+            const time = match[3].trim();
+            const sessions = parseInt(match[4], 10);
+            const hours = parseInt(match[5], 10);
+            const color = type.includes('通宵') ? 'night' : (type.includes('長班') ? 'long' : 'reg');
+
+            allRosters[monthKey][day] = { type, color, time, sessions, hours };
+            count++;
+        }
+        return count;
+    }
+
+    async function parseWithGeminiVision(dataUrl, monthKey, apiKey) {
+        const base64Data = dataUrl.split(',')[1];
+        const prompt = `請讀取這張當值排班月曆表，提取每一日(1-31)的班次資料，並只輸出純 JSON 物件，格式如下：
+        {"1": {"type":"常規班","color":"reg","time":"10:00 - 18:00","sessions":4,"hours":8}, "19": {"type":"通宵值夜班","color":"night","time":"10:00 - 00:00 (+ 值夜)","sessions":7,"hours":14}}
+        注意：color 只可以是 "reg"(綠:常規/短班/早班), "long"(藍:長班), "night"(黃:通宵值夜班)。放假的日子不要放入 JSON。`;
+
+        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [
+                        { text: prompt },
+                        { inline_data: { mime_type: 'image/jpeg', data: base64Data } }
+                    ]
+                }]
+            })
+        });
+
+        const data = await resp.json();
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error('無法解析 AI 回傳格式');
+
+        const parsedObj = JSON.parse(jsonMatch[0]);
+        allRosters[monthKey] = parsedObj;
+        return Object.keys(parsedObj).length;
+    }
+
+    function clearRawSheet() {
+        const mKey = getMonthKey(viewYear, viewMonth);
+        delete rawSheets[mKey];
+        localStorage.setItem('ckw_roster_images_v2', JSON.stringify(rawSheets));
+        renderAll();
+    }
+</script>
+
+</body>
+</html>
