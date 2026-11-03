@@ -41,7 +41,7 @@
             background-color: var(--bg-dark);
             color: var(--text-main);
             margin: 0;
-            padding: 14px;
+            padding: 10px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -54,7 +54,7 @@
             max-width: 500px;
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 12px;
         }
 
         /* 頂部標題與上傳按鈕 */
@@ -62,15 +62,16 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            padding: 2px 4px;
         }
         .header-title h2 {
             margin: 0;
-            font-size: 20px;
+            font-size: 19px;
             color: var(--text-main);
             letter-spacing: 0.5px;
         }
         .header-title p {
-            margin: 3px 0 0 0;
+            margin: 2px 0 0 0;
             font-size: 12px;
             color: var(--primary);
             font-weight: bold;
@@ -79,15 +80,16 @@
             background: linear-gradient(135deg, #38BDF8 0%, #2563EB 100%);
             color: #fff;
             border: none;
-            padding: 10px 14px;
+            padding: 9px 13px;
             border-radius: 12px;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 800;
             cursor: pointer;
             box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
+            white-space: nowrap;
         }
         .upload-trigger-btn:active { transform: scale(0.96); }
 
@@ -95,17 +97,17 @@
         .today-banner {
             background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
             border: 1px solid rgba(56, 189, 248, 0.35);
-            border-radius: 18px;
-            padding: 16px;
+            border-radius: 16px;
+            padding: 14px;
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
             gap: 12px;
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
         }
         .banner-col {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 3px;
         }
         .banner-col:first-child {
             border-right: 1px solid var(--border);
@@ -117,11 +119,11 @@
             font-weight: bold;
         }
         .banner-shift {
-            font-size: 18px;
+            font-size: 17px;
             font-weight: 900;
         }
         .banner-time {
-            font-size: 13px;
+            font-size: 12px;
             color: var(--text-main);
             font-weight: bold;
         }
@@ -133,21 +135,21 @@
         /* 全月統計 4 格看板 */
         .stats-bar {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 8px;
         }
         .stat-pill {
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 10px 6px;
+            padding: 9px 4px;
             text-align: center;
         }
         .stat-pill span {
             display: block;
             font-size: 10px;
             color: var(--text-muted);
-            margin-bottom: 3px;
+            margin-bottom: 2px;
         }
         .stat-pill strong {
             font-size: 15px;
@@ -161,7 +163,7 @@
             justify-content: space-between;
             align-items: center;
             background: var(--bg-card);
-            padding: 10px 14px;
+            padding: 9px 12px;
             border-radius: 14px;
             border: 1px solid var(--border);
         }
@@ -174,10 +176,10 @@
             background: rgba(255, 255, 255, 0.06);
             border: 1px solid var(--border);
             color: var(--text-main);
-            width: 32px;
-            height: 32px;
+            width: 30px;
+            height: 30px;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: bold;
             cursor: pointer;
         }
@@ -202,7 +204,7 @@
             color: #FBBF24;
         }
 
-        /* 快速排班印仔工具列 (開啟時顯示) */
+        /* 快速排班印仔工具列 */
         .stamp-bar {
             display: none;
             background: var(--bg-card);
@@ -234,37 +236,38 @@
             background: rgba(251, 191, 36, 0.15);
         }
 
-        /* 月曆網格 */
+        /* ================= 月曆網格 (強制 7 列絕對等闊對齊) ================= */
         .calendar-card {
             background: var(--bg-card);
-            border-radius: 18px;
-            padding: 12px;
+            border-radius: 16px;
+            padding: 10px 6px;
             border: 1px solid var(--border);
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
         }
         .weekdays-row {
             display: grid;
-            grid-template-columns: repeat(7, 1fr);
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 4px;
             text-align: center;
             font-size: 11px;
             font-weight: 800;
             color: var(--text-muted);
             padding-bottom: 8px;
             border-bottom: 1px solid var(--border);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         .weekdays-row div:first-child { color: #F87171; }
         .weekdays-row div:last-child { color: #60A5FA; }
 
         .days-grid {
             display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 5px;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 4px;
         }
         .day-cell {
-            min-height: 82px;
+            height: 88px; /* 固定統一高度，令每一橫行完美對齊 */
             border-radius: 10px;
-            padding: 5px 3px;
+            padding: 4px 2px;
             border: 1px solid var(--border);
             background: var(--off-bg);
             display: flex;
@@ -273,6 +276,7 @@
             justify-content: flex-start;
             cursor: pointer;
             position: relative;
+            overflow: hidden;
             transition: transform 0.1s;
         }
         .day-cell:active { transform: scale(0.95); }
@@ -299,54 +303,84 @@
             border-color: rgba(245, 158, 11, 0.6);
         }
 
+        /* 日期數字：強制單行、靠右對齊 */
         .day-num {
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 800;
-            align-self: flex-end;
+            width: 100%;
+            text-align: right;
             padding-right: 3px;
             color: var(--text-muted);
             margin-bottom: 3px;
+            white-space: nowrap;
+            line-height: 1.2;
+            flex-shrink: 0;
         }
-        .day-cell.today .day-num {
+        .day-cell.today .day-num span {
             color: #fff;
             background: #EF4444;
             border-radius: 4px;
-            padding: 0 4px;
+            padding: 1px 4px;
         }
 
+        /* 班別膠囊：完整顯示不截斷 */
         .shift-pill {
-            font-size: 10px;
+            font-size: 9.5px;
             font-weight: 800;
-            padding: 2px 5px;
-            border-radius: 6px;
+            padding: 2px 1px;
+            border-radius: 5px;
             margin-bottom: 3px;
             text-align: center;
-            line-height: 1.1;
-            width: 95%;
+            line-height: 1.15;
+            width: 96%;
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            letter-spacing: -0.3px;
+            flex-shrink: 0;
         }
         .type-reg .shift-pill { background: rgba(34, 197, 94, 0.25); color: var(--reg-text); }
         .type-long .shift-pill { background: rgba(59, 130, 246, 0.3); color: var(--long-text); }
-        .type-night .shift-pill { background: rgba(245, 158, 11, 0.3); color: var(--night-text); }
+        .type-night .shift-pill { background: rgba(245, 158, 11, 0.3); color: var(--night-text); font-size: 8.5px; }
 
+        /* 時間與節數：置中對齊、單行緊湊顯示 */
+        .shift-info-wrap {
+            flex: 1;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+        }
         .shift-time-mini {
             font-size: 8.5px;
             color: var(--text-main);
             font-weight: 700;
-            line-height: 1.2;
+            line-height: 1.15;
             text-align: center;
+            white-space: nowrap;
+            letter-spacing: -0.3px;
+            font-variant-numeric: tabular-nums;
+        }
+        .shift-extra-mini {
+            font-size: 8px;
+            color: var(--night-text);
+            font-weight: 700;
+            line-height: 1;
+            white-space: nowrap;
         }
         .shift-sess-mini {
-            font-size: 9px;
+            font-size: 8.5px;
             color: var(--text-muted);
-            margin-top: 2px;
+            white-space: nowrap;
+            letter-spacing: -0.2px;
+            line-height: 1.1;
+            margin-top: auto;
+            padding-bottom: 1px;
         }
         .off-dash {
-            font-size: 16px;
-            color: rgba(255, 255, 255, 0.2);
-            margin-top: 14px;
+            font-size: 15px;
+            color: rgba(255, 255, 255, 0.18);
+            margin: auto 0;
         }
 
         /* 底部備註橫幅 */
@@ -354,8 +388,8 @@
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 10px 14px;
-            font-size: 12px;
+            padding: 10px 12px;
+            font-size: 11.5px;
             color: var(--text-muted);
             text-align: center;
             line-height: 1.5;
@@ -377,7 +411,7 @@
             border: 1px solid var(--border);
         }
 
-        /* 彈出視窗 (上傳 PDF / 編輯單日更表) */
+        /* 彈出視窗 */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -434,9 +468,7 @@
         }
         .preset-btn strong { display: block; font-size: 13px; margin-bottom: 2px; }
 
-        .form-row {
-            margin-bottom: 12px;
-        }
+        .form-row { margin-bottom: 12px; }
         .form-row label {
             display: block;
             font-size: 12px;
@@ -650,12 +682,11 @@
 </div>
 
 <script>
-    // 設定 PDF.js Worker
     if (window.pdfjsLib) {
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
 
-    // 常用班別預設庫 (已更新通宵值夜班為 10:00 - 00:00 (+ 值夜) · 7節 / 14小時)
+    // 常用班別預設庫
     const SHIFT_PRESETS = [
         { type: "常規班", color: "reg", time: "10:00 - 18:00", sessions: 4, hours: 8 },
         { type: "常規班", color: "reg", time: "14:00 - 22:00", sessions: 4, hours: 8 },
@@ -692,11 +723,11 @@
         }
     };
 
-    // 使用 v2 儲存鍵，確保覆蓋舊版 92 節的快取
-    let allRosters = JSON.parse(localStorage.getItem('ckw_roster_data_v2')) || DEFAULT_NOV_2026;
-    let rawSheets = JSON.parse(localStorage.getItem('ckw_roster_images_v2')) || {};
+    // 升級至 v3 儲存鍵，強制更新舊快取
+    let allRosters = JSON.parse(localStorage.getItem('ckw_roster_data_v3')) || DEFAULT_NOV_2026;
+    let rawSheets = JSON.parse(localStorage.getItem('ckw_roster_images_v3')) || {};
     let viewYear = 2026;
-    let viewMonth = 11; // 1-12
+    let viewMonth = 11;
     let isStampMode = false;
     let activeStampIndex = 0;
     let editingDay = null;
@@ -711,7 +742,7 @@
     };
 
     function saveData() {
-        localStorage.setItem('ckw_roster_data_v2', JSON.stringify(allRosters));
+        localStorage.setItem('ckw_roster_data_v3', JSON.stringify(allRosters));
         renderAll();
     }
 
@@ -738,10 +769,8 @@
 
         const monthData = allRosters[mKey] || {};
 
-        // 1. 更新今日與聽日雷達
         updateTodayBanner();
 
-        // 2. 計算全月統計
         let workDays = 0, totalSess = 0, totalHrs = 0;
         let nightDates = [];
 
@@ -768,7 +797,6 @@
         document.getElementById('footerSummaryText').innerText =
             `※ 全月當值：${workDays}天 ｜ 總節數：${totalSess}節 (${totalHrs}小時) ｜ ${nightDetailStr}`;
 
-        // 3. 渲染月曆格仔
         const grid = document.getElementById('calendarGrid');
         grid.innerHTML = '';
 
@@ -795,17 +823,32 @@
 
             if (shift && shift.color !== 'off' && shift.type !== '放假') {
                 colorClass = `type-${shift.color || 'reg'}`;
-                const formattedTime = (shift.time || '').replace(' (+ 值夜)', '<br>(+ 值夜)');
+
+                // 簡化格仔內的班別字眼以防截斷（例如「通宵值夜班」顯示為「通宵值夜」）
+                const displayType = shift.type === '通宵值夜班' ? '通宵值夜' : shift.type;
+
+                // 將時間多餘空格收緊，確保 10:00-18:00 單行對齊
+                let rawTime = (shift.time || '').replace(/\s*-\s*/g, '-');
+                let extraLine = '';
+                if (rawTime.includes('(+')) {
+                    const parts = rawTime.split(/\s*\(\+/);
+                    rawTime = parts[0];
+                    extraLine = `<div class="shift-extra-mini">(+${parts[1]}</div>`;
+                }
+
                 contentHtml = `
-                    <div class="shift-pill">${shift.type}</div>
-                    <div class="shift-time-mini">${formattedTime}</div>
-                    <div class="shift-sess-mini">${shift.sessions}節 (${shift.hours}h)</div>
+                    <div class="shift-pill">${displayType}</div>
+                    <div class="shift-info-wrap">
+                        <div class="shift-time-mini">${rawTime}</div>
+                        ${extraLine}
+                    </div>
+                    <div class="shift-sess-mini">${shift.sessions}節(${shift.hours}h)</div>
                 `;
             }
 
             cell.className = `day-cell ${colorClass} ${isToday ? 'today' : ''}`;
             cell.innerHTML = `
-                <div class="day-num">${d}日</div>
+                <div class="day-num"><span>${d}日</span></div>
                 ${contentHtml}
             `;
 
@@ -813,7 +856,6 @@
             grid.appendChild(cell);
         }
 
-        // 4. 顯示已儲存的更表原圖
         const rawCard = document.getElementById('rawSheetCard');
         if (rawSheets[mKey]) {
             rawCard.style.display = 'flex';
@@ -998,7 +1040,7 @@
             }
 
             rawSheets[targetMonth] = previewDataUrl;
-            localStorage.setItem('ckw_roster_images_v2', JSON.stringify(rawSheets));
+            localStorage.setItem('ckw_roster_images_v3', JSON.stringify(rawSheets));
 
             const parsedCount = parseRosterTextIntoMonth(extractedText, targetMonth);
 
@@ -1086,7 +1128,7 @@
     function clearRawSheet() {
         const mKey = getMonthKey(viewYear, viewMonth);
         delete rawSheets[mKey];
-        localStorage.setItem('ckw_roster_images_v2', JSON.stringify(rawSheets));
+        localStorage.setItem('ckw_roster_images_v3', JSON.stringify(rawSheets));
         renderAll();
     }
 </script>
